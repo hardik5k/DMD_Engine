@@ -69,7 +69,7 @@ class CabDriver():
         """Determining the number of requests basis the location. 
         Use the table specified in the MDP and complete for rest of the locations"""
         city_requests_matrix = np.load('city_requests_matrix.npy')
-        requests = city_requests_matrix[state[0]]
+        requests = city_requests_matrix[state[0]][state[1]]
         
         ## (0,0) implies no action. The driver is free to refuse customer request at any point in time.
         ## Hence, add the index of  action (0,0)->[0] to account for no ride action.
@@ -104,6 +104,8 @@ class CabDriver():
             else:
                 distance -= speed_matrix[curr_time]
                 time += 1
+        print("TIME CALC", time, distance)
+        return time
 
 
     def get_next_state_and_time_func(self, state, action):
@@ -137,6 +139,7 @@ class CabDriver():
                     transit_distance = distance_matrix[curr_loc][pickup_loc]
                 ride_distance = distance_matrix[pickup_loc][drop_loc]
                 total_distance = transit_distance + ride_distance
+                print(curr_loc, pickup_loc, drop_loc, total_distance, ride_distance, transit_distance)
                 total_duration = self.get_ride_duration(curr_time, total_distance)
 
                 next_state = [drop_loc, self.update_time_day(curr_time, total_duration), 1]
@@ -148,7 +151,7 @@ class CabDriver():
         next_state= self.get_next_state_and_time_func(state, action)[0]   ## get_next_state_and_time_func() defined above       
         return next_state
     
-    def wait_probabilistic_function():
+    def wait_probabilistic_function(self):
         if np.random.rand() < 0.3:
             return 4
         else:
@@ -161,7 +164,7 @@ class CabDriver():
         price_matrix = np.load('price_matrix.npy')
         curr_loc, curr_time, curr_status = state
         pickup_loc, drop_loc = action
-        next_state, total_distance, _ = self.get_next_state_and_time_func(state, action)[1:]
+        next_state, total_distance, total_duration = self.get_next_state_and_time_func(state, action)
 
         if (curr_status == 0): 
             if (drop_loc == -1):
@@ -173,6 +176,7 @@ class CabDriver():
                 reward = self.wait_probabilistic_function()
             else:
                 reward = price_matrix[pickup_loc][drop_loc][curr_time] - FC * ((total_distance) / M)
+
 
                 
         
@@ -193,3 +197,34 @@ class CabDriver():
 
     def reset(self):
         return self.action_space, self.state_space, self.state_init
+    
+if (__name__ == '__main__'):
+    m = 12
+    t = 24
+    env = CabDriver()
+    action_space, state_space, state = env.reset()
+    initial_state = state
+    episode_time = 2
+    total_time = 0
+    done = False
+    def get_action( state):
+        possible_actions_index, actions= env.requests(state)
+        return random.choice(possible_actions_index)
+    
+    while done!= True:
+        # 1. Pick epsilon-greedy action from possible actions for the current state.
+        action= get_action(state)
+        
+        # 2. Evaluate your reward and next state
+        next_state, reward, step_time = env.step(state, env.action_space[action])
+        
+        # 3. Total time driver rode in this episode
+        total_time += step_time
+        if (total_time > episode_time):
+            done = True
+        else:
+            # 4. Append the experience to the memory
+            print(state, env.action_space[action], reward, next_state, done)   ## Note: Here action is action index
+            state = next_state
+
+
